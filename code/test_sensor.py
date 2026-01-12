@@ -1,43 +1,38 @@
 import RPi.GPIO as GPIO
 import time
 
-CS = 17
-CLK = 18
-DO = 23
+# Configuration: Sensor DO pin connected to Raspberry Pi BCM 17 (Physical Pin 11)
+DO_PIN = 17
 
-def init_GPIO():
+# Initialize GPIO settings for sensor
+def init_gpio():
+    """Set up GPIO mode and configure DO pin as input"""
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup(CS, GPIO.OUT)
-    GPIO.setup(CLK, GPIO.OUT)
-    GPIO.setup(DO, GPIO.IN)
+    GPIO.setup(DO_PIN, GPIO.IN)  # DO pin is input for digital signal
 
-def read_sensor():
-    GPIO.output(CS, GPIO.HIGH)
-    time.sleep(0.001)
-    GPIO.output(CS, GPIO.LOW)
-    time.sleep(0.001)
-    
-    data = 0
-    for i in range(10):
-        GPIO.output(CLK, GPIO.HIGH)
-        time.sleep(0.001)
-        data = data << 1
-        if GPIO.input(DO) == GPIO.HIGH:
-            data |= 1
-        GPIO.output(CLK, GPIO.LOW)
-        time.sleep(0.001)
-    
-    GPIO.output(CS, GPIO.HIGH)
-    return data
+# Read soil moisture status from sensor
+def read_soil_moisture():
+    """
+    Read digital output from sensor:
+    - Return 0: Soil is WET (low level signal)
+    - Return 1: Soil is DRY (high level signal)
+    """
+    return GPIO.input(DO_PIN)
 
+# Main function: Continuous sensor testing
 if __name__ == '__main__':
-    init_GPIO()
+    init_gpio()
     try:
+        print("Soil moisture sensor test started. Press Ctrl+C to stop.")
         while True:
-            humidity_raw = read_sensor()
-            print(f"Original humidity value：{humidity_raw}")
-            time.sleep(2)
+            moisture_level = read_soil_moisture()
+            # Translate digital value to human-readable status
+            soil_status = "WET" if moisture_level == 0 else "DRY"
+            print(f"Soil Status: {soil_status} | Digital Value: {moisture_level}")
+            time.sleep(2)  # Read data every 2 seconds
     except KeyboardInterrupt:
-        GPIO.cleanup()
+        print("\nTest interrupted by user. Cleaning up GPIO resources...")
+        GPIO.cleanup()  # Release GPIO pins
     finally:
-        GPIO.cleanup()
+        GPIO.cleanup()  # Ensure GPIO cleanup even if error occurs
+        print("Sensor test completed successfully.")
