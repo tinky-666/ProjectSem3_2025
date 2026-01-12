@@ -40,7 +40,6 @@ def read_temperature():
     # Return fixed value if no temperature sensor; update if sensor is connected
     return 25.0  # Unit: °C
 
-# Main function: Collect data for 48 hours (30-minute intervals)
 def main():
     init_gpio()
     # Define path for data storage (Raspberry Pi path)
@@ -56,8 +55,7 @@ def main():
     
     try:
         start_time = time.time()
-        # Collect data for 48 hours (48 * 3600 seconds = 172800 seconds)
-        while time.time() - start_time < 172800:
+        while time.time() - start_time < 28800:
             # Get current timestamp (format: YYYY-MM-DD HH:MM:SS)
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             # Read sensor data
