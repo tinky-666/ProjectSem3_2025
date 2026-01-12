@@ -3,78 +3,59 @@ import time
 import csv
 from datetime import datetime
 
-# Pin configuration (match test_sensor.py)
-CS_PIN = 17
-CLK_PIN = 18
-DO_PIN = 23
+# Sensor configuration
+DO_PIN = 17  # BCM 17 (Physical Pin 11)
+COLLECTION_DURATION = 28800  # 8 hours in seconds (adjust to 21600 for 6 hours)
+SAMPLING_INTERVAL = 1800  # 30 minutes in seconds (adjust to 600 for 10 mins)
 
-# Initialize GPIO for sensor
+# Initialize GPIO
 def init_gpio():
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup(CS_PIN, GPIO.OUT)
-    GPIO.setup(CLK_PIN, GPIO.OUT)
     GPIO.setup(DO_PIN, GPIO.IN)
 
-# Read raw humidity from sensor
-def read_humidity():
-    GPIO.output(CS_PIN, GPIO.HIGH)
-    time.sleep(0.001)
-    GPIO.output(CS_PIN, GPIO.LOW)
-    time.sleep(0.001)
-    
-    raw_data = 0
-    for i in range(10):
-        GPIO.output(CLK_PIN, GPIO.HIGH)
-        time.sleep(0.001)
-        raw_data = raw_data << 1
-        if GPIO.input(DO_PIN) == GPIO.HIGH:
-            raw_data |= 1
-        GPIO.output(CLK_PIN, GPIO.LOW)
-        time.sleep(0.001)
-    
-    GPIO.output(CS_PIN, GPIO.HIGH)
-    return raw_data
+# Read soil moisture status (digital output)
+def read_moisture_status():
+    """Return 0 (WET) or 1 (DRY) + human-readable status"""
+    digital_value = GPIO.input(DO_PIN)
+    status = "WET" if digital_value == 0 else "DRY"
+    return digital_value, status
 
-# Read temperature (placeholder: replace with DHT11/DHT22 code if available)
-def read_temperature():
-    # Return fixed value if no temperature sensor; update if sensor is connected
-    return 25.0  # Unit: °C
-
+# Main data collection function
 def main():
     init_gpio()
-    # Define path for data storage (Raspberry Pi path)
-    data_path = "/home/pi/ProjectSem3_2025/data/sensor_data.csv"
+    # Define file path (Raspberry Pi directory)
+    data_file_path = "/home/pi/ProjectSem3_2025/data/sensor_data.csv"
     
     # Create CSV file and write header
-    with open(data_path, 'w', newline='', encoding='utf-8') as csv_file:
+    with open(data_file_path, 'w', newline='', encoding='utf-8') as csv_file:
         csv_writer = csv.writer(csv_file)
-        csv_writer.writerow(['timestamp', 'humidity_raw', 'temperature_celsius'])
+        csv_writer.writerow(['timestamp', 'digital_value', 'soil_status'])
     
-    print("Data collection started. Will run for 48 hours (30-minute intervals).")
+    print(f"Data collection started. Duration: {COLLECTION_DURATION/3600} hours | Interval: {SAMPLING_INTERVAL/60} minutes")
     print("Press Ctrl+C to stop early (not recommended).")
     
     try:
         start_time = time.time()
-        while time.time() - start_time < 28800:
-            # Get current timestamp (format: YYYY-MM-DD HH:MM:SS)
+        # Collect data for specified duration
+        while time.time() - start_time < COLLECTION_DURATION:
+            # Get current timestamp (UTC+8)
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             # Read sensor data
-            humidity_raw = read_humidity()
-            temperature = read_temperature()
-            # Write data to CSV
-            with open(data_path, 'a', newline='', encoding='utf-8') as csv_file:
+            digital_val, soil_stat = read_moisture_status()
+            # Write to CSV
+            with open(data_file_path, 'a', newline='', encoding='utf-8') as csv_file:
                 csv_writer = csv.writer(csv_file)
-                csv_writer.writerow([current_time, humidity_raw, temperature])
-            # Print status
-            print(f"Collected: {current_time} | Humidity: {humidity_raw} | Temp: {temperature}°C")
-            # Wait for 30 minutes (1800 seconds) before next collection
-            time.sleep(1800)
+                csv_writer.writerow([current_time, digital_val, soil_stat])
+            # Print status to terminal
+            print(f"Collected: {current_time} | Value: {digital_val} | Status: {soil_stat}")
+            # Wait for next sampling interval
+            time.sleep(SAMPLING_INTERVAL)
     except KeyboardInterrupt:
-        print("\nData collection interrupted. Cleaning up GPIO...")
+        print("\nData collection interrupted by user.")
         GPIO.cleanup()
     finally:
         GPIO.cleanup()
-        print("Data collection stopped. Data saved to:", data_path)
+        print(f"Data collection finished. File saved to: {data_file_path}")
 
 if __name__ == '__main__':
     main()
